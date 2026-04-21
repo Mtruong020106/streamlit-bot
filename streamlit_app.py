@@ -6,7 +6,7 @@ from groq import Groq
 # ======================
 st.set_page_config(page_title="HSB AI Advisor", page_icon="🎓")
 
-# 🔑 lấy API từ secrets
+# 🔑 API KEY từ Streamlit Secrets
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 # ======================
@@ -21,7 +21,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================
-# DATA
+# DATA HSB
 # ======================
 hsb = {
     "mac": "Marketing & Truyền thông",
@@ -34,25 +34,29 @@ hsb = {
 }
 
 # ======================
-# AI FUNCTION
+# AI FUNCTION (ĐÃ FIX MODEL MỚI)
 # ======================
 def hoi_ai(text):
     try:
         response = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system",
                     "content": (
                         "Bạn là chuyên gia tư vấn ngành HSB. "
-                        "Phân tích điểm mạnh, điểm yếu, tính cách "
+                        "Phân tích cực kỳ chi tiết: điểm mạnh, điểm yếu, tính cách "
                         "và gợi ý ngành phù hợp trong 7 ngành HSB."
                     )
                 },
-                {"role": "user", "content": text}
+                {
+                    "role": "user",
+                    "content": text
+                }
             ]
         )
         return response.choices[0].message.content
+
     except Exception as e:
         return f"⚠️ AI lỗi: {e}"
 
@@ -71,13 +75,13 @@ if "profile" not in st.session_state:
 if "init" not in st.session_state:
     st.session_state.messages.append({
         "role": "assistant",
-        "content": "👋 Mình sẽ tư vấn ngành cho bạn.\n\n👉 Bạn hãy mô tả **điểm mạnh** của bạn"
+        "content": "👋 Mình sẽ tư vấn ngành cho bạn.\n\n👉 Hãy mô tả **điểm mạnh** của bạn"
     })
     st.session_state.init = True
     st.session_state.step = 1
 
 # ======================
-# DISPLAY CHAT
+# CHAT DISPLAY
 # ======================
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
