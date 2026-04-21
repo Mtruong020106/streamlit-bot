@@ -1,13 +1,17 @@
 import streamlit as st
 from groq import Groq
 
-# ====== API KEY ======
-client = Groq(api_key="YOUR_GROQ_API_KEY")
-
-# ====== CONFIG ======
+# ======================
+# CONFIG
+# ======================
 st.set_page_config(page_title="HSB AI Advisor", page_icon="🎓")
 
-# ====== STYLE ======
+# 🔑 lấy API từ secrets
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+
+# ======================
+# STYLE
+# ======================
 st.markdown("""
 <style>
 .stApp {
@@ -16,7 +20,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ====== DATA ======
+# ======================
+# DATA
+# ======================
 hsb = {
     "mac": "Marketing & Truyền thông",
     "met": "Công nghệ & Doanh nghiệp",
@@ -27,27 +33,32 @@ hsb = {
     "kinh doanh": "Kinh doanh & Phân tích"
 }
 
-# ====== AI ======
+# ======================
+# AI FUNCTION
+# ======================
 def hoi_ai(text):
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="llama3-8b-8192",
             messages=[
                 {
                     "role": "system",
-                    "content": "Bạn là chuyên gia tư vấn ngành HSB. Phân tích cực kỳ chi tiết điểm mạnh, điểm yếu, tính cách và gợi ý ngành phù hợp trong 7 ngành HSB."
+                    "content": (
+                        "Bạn là chuyên gia tư vấn ngành HSB. "
+                        "Phân tích điểm mạnh, điểm yếu, tính cách "
+                        "và gợi ý ngành phù hợp trong 7 ngành HSB."
+                    )
                 },
-                {
-                    "role": "user",
-                    "content": text
-                }
+                {"role": "user", "content": text}
             ]
         )
         return response.choices[0].message.content
     except Exception as e:
         return f"⚠️ AI lỗi: {e}"
 
-# ====== INIT ======
+# ======================
+# SESSION STATE
+# ======================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -57,18 +68,24 @@ if "step" not in st.session_state:
 if "profile" not in st.session_state:
     st.session_state.profile = ""
 
-# ====== HIỂN THỊ CHAT ======
+if "init" not in st.session_state:
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": "👋 Mình sẽ tư vấn ngành cho bạn.\n\n👉 Bạn hãy mô tả **điểm mạnh** của bạn"
+    })
+    st.session_state.init = True
+    st.session_state.step = 1
+
+# ======================
+# DISPLAY CHAT
+# ======================
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# ====== BOT HỎI ======
-if st.session_state.step == 0:
-    msg = "👋 Mình sẽ tư vấn ngành cho bạn.\n\n👉 Bạn hãy mô tả **điểm mạnh** của bạn"
-    st.session_state.messages.append({"role": "assistant", "content": msg})
-    st.session_state.step = 1
-
-# ====== INPUT ======
+# ======================
+# INPUT
+# ======================
 user_input = st.chat_input("Nhập tại đây...")
 
 if user_input:
@@ -90,9 +107,8 @@ if user_input:
     elif st.session_state.step == 3:
         st.session_state.profile += " " + user_input
 
-        # ===== RULE BASE =====
         text = st.session_state.profile.lower()
-        score = {k:0 for k in hsb}
+        score = {k: 0 for k in hsb}
 
         if "sáng tạo" in text:
             score["mac"] += 3
@@ -110,7 +126,6 @@ if user_input:
 
         reply = f"🎯 Gợi ý nhanh: {hsb[best]}\n\n"
 
-        # ===== AI =====
         ai_text = hoi_ai(st.session_state.profile)
 
         reply += "🤖 Phân tích AI:\n"
@@ -119,7 +134,7 @@ if user_input:
         st.session_state.step = 4
 
     else:
-        reply = "👉 Reload để làm lại nhé!"
+        reply = "👉 Reload trang để làm lại nhé!"
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
     st.rerun()
