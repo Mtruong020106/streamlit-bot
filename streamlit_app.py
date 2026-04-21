@@ -1,8 +1,8 @@
 import streamlit as st
 from openai import OpenAI
 
-# ====== API KEY (DÁN KEY MỚI VÀO ĐÂY) ======
-client = OpenAI(api_key="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")
+# lấy từ Streamlit Secrets
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # ====== CONFIG ======
 st.set_page_config(page_title="HSB AI Advisor", page_icon="🎓")
