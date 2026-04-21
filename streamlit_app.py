@@ -4,23 +4,57 @@ from groq import Groq
 # ======================
 # CONFIG
 # ======================
-st.set_page_config(page_title="HSB AI Counselor", page_icon="🎓")
+st.set_page_config(
+    page_title="HSB AI Counselor",
+    page_icon="🎓",
+    layout="centered"
+)
 
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 # ======================
-# STYLE
+# UI STYLE (CHATGPT STYLE)
 # ======================
 st.markdown("""
 <style>
+/* nền */
 .stApp {
-    background: linear-gradient(to right, #eef2f7, #ffffff);
+    background: linear-gradient(135deg, #eef2f7, #ffffff);
+    font-family: 'Arial';
+}
+
+/* chat bubble user */
+div[data-testid="stChatMessage"]:has(div[data-testid="stChatMessageContent"]) {
+    padding: 10px;
+}
+
+/* header */
+h1 {
+    text-align: center;
+    color: #1f4e79;
+}
+
+/* container */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* input box */
+div[data-testid="stChatInput"] {
+    border-radius: 12px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ======================
-# HSB DATA
+# TITLE
+# ======================
+st.title("🎓 HSB AI Admission Counselor")
+st.caption("AI tư vấn ngành học giống cố vấn thật")
+
+# ======================
+# DATA
 # ======================
 hsb = {
     "mac": "Marketing & Truyền thông",
@@ -32,20 +66,15 @@ hsb = {
     "kinh doanh": "Kinh doanh & Phân tích"
 }
 
-# ======================
-# MODEL FALLBACK (CHỐNG CHẾT MODEL)
-# ======================
 MODELS = [
     "llama-3.1-8b-instant",
     "llama-3.2-11b-text-preview"
 ]
 
 # ======================
-# AI COUNSELOR
+# AI FUNCTION
 # ======================
 def hoi_ai(profile):
-    last_error = None
-
     for model in MODELS:
         try:
             response = client.chat.completions.create(
@@ -54,30 +83,19 @@ def hoi_ai(profile):
                     {
                         "role": "system",
                         "content": (
-                            "Bạn là chuyên gia tư vấn tuyển sinh HSB. "
-                            "Chỉ được chọn 7 ngành: Marketing & Truyền thông, "
-                            "Công nghệ & Doanh nghiệp, Dịch vụ & Chăm sóc, "
-                            "Nhân lực & Lãnh đạo, An ninh & Quản trị, "
-                            "An ninh phi truyền thống, Kinh doanh & Phân tích. "
-                            "KHÔNG được bịa ngành mới.\n\n"
-                            "Yêu cầu:\n"
-                            "- Phân tích tính cách\n"
-                            "- Chấm điểm từng ngành (0-10)\n"
-                            "- Chọn ngành phù hợp nhất\n"
-                            "- Giải thích lý do\n"
-                            "- Luôn hỏi ngược lại 2 câu để khai thác thêm thông tin"
+                            "Bạn là cố vấn tuyển sinh chuyên nghiệp HSB. "
+                            "Chỉ dùng 7 ngành HSB, không bịa ngành. "
+                            "Luôn phân tích chi tiết + hỏi ngược lại 2 câu."
                         )
                     },
                     {"role": "user", "content": profile}
                 ]
             )
             return response.choices[0].message.content
-
-        except Exception as e:
-            last_error = e
+        except:
             continue
 
-    return f"⚠️ AI lỗi toàn bộ model: {last_error}"
+    return "⚠️ AI đang lỗi, thử lại sau."
 
 # ======================
 # SESSION STATE
@@ -91,29 +109,27 @@ if "step" not in st.session_state:
 if "profile" not in st.session_state:
     st.session_state.profile = ""
 
-if "init" not in st.session_state:
+# ======================
+# INIT MESSAGE
+# ======================
+if len(st.session_state.messages) == 0:
     st.session_state.messages.append({
         "role": "assistant",
-        "content": (
-            "🎓 Chào bạn! Mình là cố vấn tuyển sinh HSB.\n\n"
-            "Mình sẽ giúp bạn chọn ngành phù hợp nhất.\n\n"
-            "👉 Hãy bắt đầu bằng cách mô tả **điểm mạnh** của bạn"
-        )
+        "content": "👋 Chào bạn! Mình sẽ giúp bạn chọn ngành phù hợp.\n\n👉 Hãy mô tả **điểm mạnh** của bạn"
     })
-    st.session_state.init = True
     st.session_state.step = 1
 
 # ======================
-# CHAT DISPLAY
+# CHAT DISPLAY (CLEAN UI)
 # ======================
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+        st.markdown(msg["content"])
 
 # ======================
 # INPUT
 # ======================
-user_input = st.chat_input("Nhập câu trả lời...")
+user_input = st.chat_input("Nhập câu trả lời của bạn...")
 
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -134,27 +150,36 @@ if user_input:
     elif st.session_state.step == 3:
         st.session_state.profile += " Sở thích: " + user_input
 
-        reply = "🎓 Đang phân tích hồ sơ của bạn...\n\n"
+        with st.spinner("🎓 Đang phân tích hồ sơ..."):
+            ai_text = hoi_ai(st.session_state.profile)
 
-        ai_text = hoi_ai(st.session_state.profile)
+        reply = f"""
+---
 
-        reply += ai_text
+## 🎯 Kết quả tư vấn
+
+{ai_text}
+
+---
+
+💡 *HSB AI Counselor*
+"""
 
         st.session_state.step = 4
 
-    # STEP 4 → hỏi ngược tiếp
+    # STEP 4
     elif st.session_state.step == 4:
         reply = (
-            "👍 Mình hiểu thêm rồi.\n\n"
-            "👉 Bạn thích môi trường nào hơn?\n"
-            "- Văn phòng\n"
-            "- Ngoài thực địa\n"
-            "- Hay kết hợp cả hai?"
+            "👉 Mình hỏi thêm nhé:\n\n"
+            "Bạn thích môi trường nào hơn?\n"
+            "🏢 Văn phòng\n"
+            "🌿 Ngoài thực địa\n"
+            "🔄 Kết hợp cả hai"
         )
         st.session_state.step = 5
 
     else:
-        reply = "👉 Bạn muốn làm lại? Hãy refresh trang nhé."
+        reply = "👉 Nhấn refresh để làm lại bài test nhé."
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
     st.rerun()
