@@ -1,121 +1,61 @@
 import streamlit as st
 
 # ====== CONFIG ======
-st.set_page_config(page_title="HSB Chatbot", page_icon="🎓", layout="centered")
+st.set_page_config(page_title="HSB AI Advisor", page_icon="🎓", layout="centered")
 
 # ====== STYLE ======
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(to right, #eef2ff, #ffffff);
+    background: linear-gradient(to right, #f5f7fa, #c3cfe2);
 }
-.block-container {
-    padding-top: 2rem;
+.chat-user {
+    background-color: #0084ff;
+    color: white;
+    padding: 10px;
+    border-radius: 10px;
+    margin: 5px 0;
+}
+.chat-bot {
+    background-color: #e4e6eb;
+    padding: 10px;
+    border-radius: 10px;
+    margin: 5px 0;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ====== DATA ======
-hsb_info = {
-    "nganh": {
-        "mas": "Quản trị và An ninh (MAS)",
-        "hat": "Quản trị nhân tài và nhân lực (HAT)",
-        "met": "Quản trị doanh nghiệp và công nghệ (MET)",
-        "bns": "Quản trị an ninh phi truyền thống (BNS)",
-        "mac": "Marketing và truyền thông (MAC)",
-        "has": "Quản trị dịch vụ khách hàng và chăm sóc sức khỏe (HAS)",
-        "kinh doanh": "Ngành Kinh doanh (Marketing + Phân tích kinh doanh)"
-    }
+hsb = {
+    "mac": {"ten": "Marketing & Truyền thông", "desc": "Sáng tạo, content, truyền thông"},
+    "met": {"ten": "Công nghệ & Doanh nghiệp", "desc": "Startup, công nghệ, đổi mới"},
+    "has": {"ten": "Dịch vụ & Chăm sóc", "desc": "Giao tiếp, chăm sóc, phục vụ"},
+    "hat": {"ten": "Nhân lực & Lãnh đạo", "desc": "Quản lý con người, lãnh đạo"},
+    "mas": {"ten": "An ninh & Quản trị", "desc": "Logic, kiểm soát rủi ro"},
+    "bns": {"ten": "An ninh phi truyền thống", "desc": "Xã hội, an ninh hiện đại"},
+    "kinh doanh": {"ten": "Kinh doanh & Phân tích", "desc": "Logic, số liệu, kinh doanh"}
 }
 
-# ====== PHÂN TÍCH ======
-def phan_tich(cau):
-    cau = cau.lower()
-
-    diem = {
-        "mac": 0,
-        "has": 0,
-        "met": 0,
-        "mas": 0,
-        "hat": 0,
-        "kinh doanh": 0,
-        "bns": 0
-    }
-
-    ly_do = []
-
-    # ===== ĐIỂM MẠNH =====
-    if any(x in cau for x in ["sáng tạo", "content", "ý tưởng"]):
-        diem["mac"] += 3
-        ly_do.append("Bạn có tính sáng tạo → hợp Marketing")
-
-    if any(x in cau for x in ["giao tiếp", "thuyết trình"]):
-        diem["has"] += 2
-        diem["hat"] += 2
-        ly_do.append("Bạn giao tiếp tốt → hợp ngành dịch vụ / nhân sự")
-
-    if any(x in cau for x in ["công nghệ", "it", "startup"]):
-        diem["met"] += 3
-        ly_do.append("Bạn thích công nghệ → hợp MET")
-
-    if any(x in cau for x in ["logic", "phân tích", "số liệu"]):
-        diem["kinh doanh"] += 3
-        ly_do.append("Bạn mạnh logic → hợp ngành kinh doanh phân tích")
-
-    if any(x in cau for x in ["giúp người", "dịch vụ"]):
-        diem["has"] += 3
-        ly_do.append("Bạn thích giúp người → hợp HAS")
-
-    if any(x in cau for x in ["lãnh đạo", "quản lý"]):
-        diem["hat"] += 3
-        ly_do.append("Bạn có tố chất lãnh đạo → hợp HAT")
-
-    if any(x in cau for x in ["an ninh", "rủi ro"]):
-        diem["mas"] += 3
-        diem["bns"] += 2
-        ly_do.append("Bạn quan tâm an ninh → hợp MAS/BNS")
-
-    # ===== ĐIỂM YẾU =====
-    if "yếu toán" in cau:
-        diem["kinh doanh"] -= 2
-        ly_do.append("Bạn yếu toán → hạn chế ngành phân tích")
-
-    if "ít nói" in cau or "hướng nội" in cau:
-        diem["has"] -= 2
-        diem["hat"] -= 2
-        ly_do.append("Bạn ít giao tiếp → không hợp dịch vụ")
-
-    # ===== XỬ LÝ KẾT QUẢ =====
-    sorted_nganh = sorted(diem.items(), key=lambda x: x[1], reverse=True)
-
-    top1 = sorted_nganh[0]
-    top2 = sorted_nganh[1]
-
-    tong = sum([max(v, 0) for v in diem.values()]) + 1
-
-    percent1 = int((max(top1[1],0) / tong) * 100)
-    percent2 = int((max(top2[1],0) / tong) * 100)
-
-    return top1, top2, percent1, percent2, ly_do
-
-# ====== UI ======
-st.title("🎓 Chatbot tư vấn ngành HSB")
-st.caption("Nhập điểm mạnh / điểm yếu để được tư vấn")
-
-# ====== CHAT ======
+# ====== INIT ======
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "step" not in st.session_state:
     st.session_state.step = 0
 
-# hiển thị chat
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+if "profile" not in st.session_state:
+    st.session_state.profile = ""
 
-# ====== BOT HỎI NGƯỢC ======
+# ====== HIỂN THỊ CHAT ======
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
+
+# ====== BOT FLOW ======
+
 if st.session_state.step == 0:
-    st.chat_message("assistant").write("Bạn hãy mô tả điểm mạnh / điểm yếu của bạn (VD: sáng tạo, yếu toán...)")
+    msg = "👋 Mình sẽ giúp bạn chọn ngành HSB.\n\n👉 Bạn hãy mô tả **điểm mạnh** của bạn (ví dụ: sáng tạo, giao tiếp tốt, thích công nghệ...)"
+    st.session_state.messages.append({"role": "assistant", "content": msg})
     st.session_state.step = 1
 
 # ====== INPUT ======
@@ -123,26 +63,95 @@ user_input = st.chat_input("Nhập tại đây...")
 
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
-    st.chat_message("user").write(user_input)
 
-    # ====== PHÂN TÍCH ======
-    top1, top2, p1, p2, ly_do = phan_tich(user_input)
+    # ====== STEP 1 ======
+    if st.session_state.step == 1:
+        st.session_state.profile += " " + user_input
+        reply = "👍 Ok. Giờ cho mình biết **điểm yếu** của bạn? (vd: yếu toán, ngại giao tiếp...)"
+        st.session_state.step = 2
 
-    nganh1 = hsb_info["nganh"][top1[0]]
-    nganh2 = hsb_info["nganh"][top2[0]]
+    # ====== STEP 2 ======
+    elif st.session_state.step == 2:
+        st.session_state.profile += " " + user_input
+        reply = "👉 Bạn thích làm việc với:\n- con người\n- máy tính/công nghệ\n- hay làm việc độc lập?"
+        st.session_state.step = 3
 
-    reply = f"""
-🎯 **Ngành phù hợp nhất:** {nganh1} ({p1}%)
+    # ====== STEP 3 ======
+    elif st.session_state.step == 3:
+        st.session_state.profile += " " + user_input
+        reply = "👉 Bạn có chịu được áp lực cao không? (có / không / trung bình)"
+        st.session_state.step = 4
 
-🥈 **Gợi ý thêm:** {nganh2} ({p2}%)
+    # ====== STEP 4 ======
+    elif st.session_state.step == 4:
+        st.session_state.profile += " " + user_input
 
-📊 **Phân tích:**
-"""
+        # ====== PHÂN TÍCH ======
+        text = st.session_state.profile.lower()
 
-    for ld in ly_do:
-        reply += f"\n- {ld}"
+        score = {k:0 for k in hsb}
+        explain = []
 
-    reply += "\n\n👉 Bạn có muốn mình phân tích sâu hơn không?"
+        # sáng tạo
+        if "sáng tạo" in text:
+            score["mac"] += 3
+            explain.append("Bạn sáng tạo → cực hợp Marketing")
+
+        # giao tiếp
+        if "giao tiếp" in text:
+            score["has"] += 2
+            score["hat"] += 2
+            explain.append("Bạn giao tiếp tốt → hợp dịch vụ / nhân sự")
+
+        # công nghệ
+        if "công nghệ" in text or "it" in text:
+            score["met"] += 3
+            explain.append("Bạn thích công nghệ → hợp MET")
+
+        # logic
+        if "logic" in text or "phân tích" in text:
+            score["kinh doanh"] += 3
+            explain.append("Bạn có tư duy logic → hợp ngành phân tích")
+
+        # yếu toán
+        if "yếu toán" in text:
+            score["kinh doanh"] -= 2
+            explain.append("Bạn yếu toán → hạn chế ngành phân tích")
+
+        # hướng nội
+        if "hướng nội" in text:
+            score["has"] -= 2
+            explain.append("Bạn hướng nội → không hợp ngành giao tiếp nhiều")
+
+        # áp lực
+        if "không" in text and "áp lực" in text:
+            score["mac"] -= 1
+            explain.append("Bạn không thích áp lực → nên tránh ngành cạnh tranh cao")
+
+        # ====== SORT ======
+        sorted_score = sorted(score.items(), key=lambda x: x[1], reverse=True)
+
+        best = sorted_score[0]
+        second = sorted_score[1]
+
+        reply = "📊 **PHÂN TÍCH CHI TIẾT**\n\n"
+
+        for e in explain:
+            reply += f"- {e}\n"
+
+        reply += "\n📈 **ĐIỂM TỪNG NGÀNH:**\n"
+        for k,v in sorted_score:
+            reply += f"- {hsb[k]['ten']}: {v} điểm\n"
+
+        reply += f"\n🎯 **KẾT LUẬN:**\n👉 Ngành phù hợp nhất: **{hsb[best[0]]['ten']}**\n"
+        reply += f"👉 Gợi ý thêm: **{hsb[second[0]]['ten']}**\n\n"
+
+        reply += "💡 " + hsb[best[0]]["desc"]
+
+        st.session_state.step = 5
+
+    else:
+        reply = "👉 Reload để tư vấn lại nhé!"
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
-    st.chat_message("assistant").write(reply)
+    st.rerun()
