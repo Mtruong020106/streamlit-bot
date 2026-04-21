@@ -1,8 +1,8 @@
 import streamlit as st
-from openai import OpenAI
+from groq import Groq
 
-# lấy từ Streamlit Secrets
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# ====== API KEY ======
+client = Groq(api_key="YOUR_GROQ_API_KEY")
 
 # ====== CONFIG ======
 st.set_page_config(page_title="HSB AI Advisor", page_icon="🎓")
