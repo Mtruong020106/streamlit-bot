@@ -4,7 +4,7 @@ from groq import Groq
 # ======================
 # CONFIG
 # ======================
-st.set_page_config(page_title="HSB Admission Counselor", page_icon="🎓")
+st.set_page_config(page_title="HSB AI Counselor", page_icon="🎓")
 
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
@@ -20,7 +20,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================
-# NGÀNH HSB
+# HSB DATA
 # ======================
 hsb = {
     "mac": "Marketing & Truyền thông",
@@ -33,38 +33,51 @@ hsb = {
 }
 
 # ======================
-# AI COUNSELOR (GIỐNG TƯ VẤN THẬT)
+# MODEL FALLBACK (CHỐNG CHẾT MODEL)
+# ======================
+MODELS = [
+    "llama-3.1-8b-instant",
+    "llama-3.2-11b-text-preview"
+]
+
+# ======================
+# AI COUNSELOR
 # ======================
 def hoi_ai(profile):
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Bạn là chuyên gia tư vấn tuyển sinh đại học HSB. "
-                        "Nhiệm vụ: phân tích học sinh như cố vấn thật.\n\n"
-                        "QUY TẮC:\n"
-                        "- Chỉ chọn 7 ngành HSB\n"
-                        "- Chấm điểm từng ngành (0-10)\n"
-                        "- Giải thích ngắn gọn vì sao phù hợp\n"
-                        "- Luôn hỏi NGƯỢC LẠI 2 câu để khai thác thêm thông tin\n\n"
-                        "FORMAT OUTPUT:\n"
-                        "1. Phân tích tính cách\n"
-                        "2. Bảng điểm ngành\n"
-                        "3. Ngành phù hợp nhất\n"
-                        "4. Lý do\n"
-                        "5. 2 câu hỏi ngược lại người dùng"
-                    )
-                },
-                {"role": "user", "content": profile}
-            ]
-        )
-        return response.choices[0].message.content
+    last_error = None
 
-    except Exception as e:
-        return f"⚠️ AI lỗi: {e}"
+    for model in MODELS:
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Bạn là chuyên gia tư vấn tuyển sinh HSB. "
+                            "Chỉ được chọn 7 ngành: Marketing & Truyền thông, "
+                            "Công nghệ & Doanh nghiệp, Dịch vụ & Chăm sóc, "
+                            "Nhân lực & Lãnh đạo, An ninh & Quản trị, "
+                            "An ninh phi truyền thống, Kinh doanh & Phân tích. "
+                            "KHÔNG được bịa ngành mới.\n\n"
+                            "Yêu cầu:\n"
+                            "- Phân tích tính cách\n"
+                            "- Chấm điểm từng ngành (0-10)\n"
+                            "- Chọn ngành phù hợp nhất\n"
+                            "- Giải thích lý do\n"
+                            "- Luôn hỏi ngược lại 2 câu để khai thác thêm thông tin"
+                        )
+                    },
+                    {"role": "user", "content": profile}
+                ]
+            )
+            return response.choices[0].message.content
+
+        except Exception as e:
+            last_error = e
+            continue
+
+    return f"⚠️ AI lỗi toàn bộ model: {last_error}"
 
 # ======================
 # SESSION STATE
@@ -82,9 +95,9 @@ if "init" not in st.session_state:
     st.session_state.messages.append({
         "role": "assistant",
         "content": (
-            "🎓 Chào bạn, mình là cố vấn tuyển sinh HSB.\n\n"
+            "🎓 Chào bạn! Mình là cố vấn tuyển sinh HSB.\n\n"
             "Mình sẽ giúp bạn chọn ngành phù hợp nhất.\n\n"
-            "👉 Đầu tiên: Hãy mô tả điểm mạnh của bạn"
+            "👉 Hãy bắt đầu bằng cách mô tả **điểm mạnh** của bạn"
         )
     })
     st.session_state.init = True
@@ -117,7 +130,7 @@ if user_input:
         reply = "👉 Bạn thích làm việc với con người hay công nghệ?"
         st.session_state.step = 3
 
-    # STEP 3 → AI COUNSELOR
+    # STEP 3 → AI ANALYSIS
     elif st.session_state.step == 3:
         st.session_state.profile += " Sở thích: " + user_input
 
@@ -129,16 +142,19 @@ if user_input:
 
         st.session_state.step = 4
 
-    # STEP 4 → hỏi tiếp như tư vấn thật
-    else:
+    # STEP 4 → hỏi ngược tiếp
+    elif st.session_state.step == 4:
         reply = (
             "👍 Mình hiểu thêm rồi.\n\n"
-            "👉 Bạn muốn làm việc môi trường:\n"
+            "👉 Bạn thích môi trường nào hơn?\n"
             "- Văn phòng\n"
             "- Ngoài thực địa\n"
             "- Hay kết hợp cả hai?"
         )
         st.session_state.step = 5
+
+    else:
+        reply = "👉 Bạn muốn làm lại? Hãy refresh trang nhé."
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
     st.rerun()
