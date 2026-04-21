@@ -1,121 +1,148 @@
-
 import streamlit as st
 
+# ====== CONFIG ======
+st.set_page_config(page_title="HSB Chatbot", page_icon="🎓", layout="centered")
 
-# ====== (TÙY CHỌN) AI ======
-USE_AI = False
-try:
-    from openai import OpenAI
-    client = OpenAI(api_key="YOUR_API_KEY")  # thay nếu dùng
-    USE_AI = True
-except:
-    USE_AI = False
+# ====== STYLE ======
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(to right, #eef2ff, #ffffff);
+}
+.block-container {
+    padding-top: 2rem;
+}
+</style>
+""", unsafe_allow_html=True)
 
-def hoi_ai(cau_hoi):
-    if not USE_AI:
-        return "Mình chưa hiểu rõ, bạn có thể hỏi cụ thể hơn về HSB nhé 🤔"
-    
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": "Bạn là chatbot tư vấn tuyển sinh của HSB (ĐHQGHN), trả lời ngắn gọn, dễ hiểu"
-            },
-            {"role": "user", "content": cau_hoi}
-        ]
-    )
-    return response.choices[0].message.content
-
-
-# ====== DATA HSB ======
+# ====== DATA ======
 hsb_info = {
-    "ten": "Trường Quản trị và Kinh doanh (HSB - ĐHQGHN)",
     "nganh": {
-        "marketing": "Marketing",
-        "kinh doanh": "Kinh doanh quốc tế",
-        "nhân lực": "Quản trị nhân lực",
-        "quan ly": "Quản trị doanh nghiệp"
-    },
-    "hoc_phi": "60-80 triệu/năm",
-    "to_hop": ["D01", "A01", "C14"],
-    "diem_chuan": 20,
-    "mo_ta": "Trường đào tạo theo hướng thực tiễn, năng động, phù hợp với người thích kinh doanh"
+        "mas": "Quản trị và An ninh (MAS)",
+        "hat": "Quản trị nhân tài và nhân lực (HAT)",
+        "met": "Quản trị doanh nghiệp và công nghệ (MET)",
+        "bns": "Quản trị an ninh phi truyền thống (BNS)",
+        "mac": "Marketing và truyền thông (MAC)",
+        "has": "Quản trị dịch vụ khách hàng và chăm sóc sức khỏe (HAS)",
+        "kinh doanh": "Ngành Kinh doanh (Marketing + Phân tích kinh doanh)"
+    }
 }
 
+# ====== PHÂN TÍCH ======
+def phan_tich(cau):
+    cau = cau.lower()
+
+    diem = {
+        "mac": 0,
+        "has": 0,
+        "met": 0,
+        "mas": 0,
+        "hat": 0,
+        "kinh doanh": 0,
+        "bns": 0
+    }
+
+    ly_do = []
+
+    # ===== ĐIỂM MẠNH =====
+    if any(x in cau for x in ["sáng tạo", "content", "ý tưởng"]):
+        diem["mac"] += 3
+        ly_do.append("Bạn có tính sáng tạo → hợp Marketing")
+
+    if any(x in cau for x in ["giao tiếp", "thuyết trình"]):
+        diem["has"] += 2
+        diem["hat"] += 2
+        ly_do.append("Bạn giao tiếp tốt → hợp ngành dịch vụ / nhân sự")
+
+    if any(x in cau for x in ["công nghệ", "it", "startup"]):
+        diem["met"] += 3
+        ly_do.append("Bạn thích công nghệ → hợp MET")
+
+    if any(x in cau for x in ["logic", "phân tích", "số liệu"]):
+        diem["kinh doanh"] += 3
+        ly_do.append("Bạn mạnh logic → hợp ngành kinh doanh phân tích")
+
+    if any(x in cau for x in ["giúp người", "dịch vụ"]):
+        diem["has"] += 3
+        ly_do.append("Bạn thích giúp người → hợp HAS")
+
+    if any(x in cau for x in ["lãnh đạo", "quản lý"]):
+        diem["hat"] += 3
+        ly_do.append("Bạn có tố chất lãnh đạo → hợp HAT")
+
+    if any(x in cau for x in ["an ninh", "rủi ro"]):
+        diem["mas"] += 3
+        diem["bns"] += 2
+        ly_do.append("Bạn quan tâm an ninh → hợp MAS/BNS")
+
+    # ===== ĐIỂM YẾU =====
+    if "yếu toán" in cau:
+        diem["kinh doanh"] -= 2
+        ly_do.append("Bạn yếu toán → hạn chế ngành phân tích")
+
+    if "ít nói" in cau or "hướng nội" in cau:
+        diem["has"] -= 2
+        diem["hat"] -= 2
+        ly_do.append("Bạn ít giao tiếp → không hợp dịch vụ")
+
+    # ===== XỬ LÝ KẾT QUẢ =====
+    sorted_nganh = sorted(diem.items(), key=lambda x: x[1], reverse=True)
+
+    top1 = sorted_nganh[0]
+    top2 = sorted_nganh[1]
+
+    tong = sum([max(v, 0) for v in diem.values()]) + 1
+
+    percent1 = int((max(top1[1],0) / tong) * 100)
+    percent2 = int((max(top2[1],0) / tong) * 100)
+
+    return top1, top2, percent1, percent2, ly_do
 
 # ====== UI ======
-st.set_page_config(page_title="Chatbot HSB", layout="centered")
+st.title("🎓 Chatbot tư vấn ngành HSB")
+st.caption("Nhập điểm mạnh / điểm yếu để được tư vấn")
 
-st.title("🎓 Chatbot tư vấn HSB")
-
-# sidebar
-st.sidebar.title("Thông tin nhanh")
-st.sidebar.write("📍 HSB - ĐHQGHN")
-st.sidebar.write("💰 60-80 triệu/năm")
-st.sidebar.write("📚 Marketing, KDQT, Nhân lực")
-
-# lưu lịch sử chat
+# ====== CHAT ======
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# hiển thị chat cũ
+if "step" not in st.session_state:
+    st.session_state.step = 0
+
+# hiển thị chat
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
-# nhập chat
-user_input = st.chat_input("Hỏi về HSB...")
+# ====== BOT HỎI NGƯỢC ======
+if st.session_state.step == 0:
+    st.chat_message("assistant").write("Bạn hãy mô tả điểm mạnh / điểm yếu của bạn (VD: sáng tạo, yếu toán...)")
+    st.session_state.step = 1
+
+# ====== INPUT ======
+user_input = st.chat_input("Nhập tại đây...")
 
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
     st.chat_message("user").write(user_input)
 
-    cau = user_input.lower()
+    # ====== PHÂN TÍCH ======
+    top1, top2, p1, p2, ly_do = phan_tich(user_input)
 
-    # ====== LOGIC ======
-    if "ngành" in cau:
-        reply = "HSB có các ngành: " + ", ".join(hsb_info["nganh"].values())
+    nganh1 = hsb_info["nganh"][top1[0]]
+    nganh2 = hsb_info["nganh"][top2[0]]
 
-    elif "học phí" in cau:
-        reply = "Học phí khoảng: " + hsb_info["hoc_phi"]
+    reply = f"""
+🎯 **Ngành phù hợp nhất:** {nganh1} ({p1}%)
 
-    elif "khối" in cau or "tổ hợp" in cau:
-        reply = "Xét các tổ hợp: " + ", ".join(hsb_info["to_hop"])
+🥈 **Gợi ý thêm:** {nganh2} ({p2}%)
 
-    elif "giới thiệu" in cau:
-        reply = hsb_info["mo_ta"]
+📊 **Phân tích:**
+"""
 
-    elif "có nên học" in cau:
-        reply = "Nếu bạn thích môi trường năng động, thực tế thì HSB rất đáng cân nhắc 👍"
+    for ld in ly_do:
+        reply += f"\n- {ld}"
 
-    elif "tư vấn" in cau:
-        reply = "Bạn hãy nhập theo dạng: [sở thích] + [điểm] (VD: marketing 22)"
-
-    # ====== TƯ VẤN THÔNG MINH ======
-    elif any(x in cau for x in ["marketing", "kinh doanh", "nhân lực", "quan ly"]):
-        words = cau.split()
-        diem = None
-
-        for w in words:
-            if w.isdigit():
-                diem = int(w)
-
-        if diem is None:
-            reply = "Bạn hãy nhập thêm điểm nhé (VD: marketing 22)"
-        else:
-            if diem >= hsb_info["diem_chuan"]:
-                for key in hsb_info["nganh"]:
-                    if key in cau:
-                        reply = f"Bạn hợp ngành {hsb_info['nganh'][key]} tại HSB 🎯"
-                        break
-                else:
-                    reply = "Bạn có thể học Quản trị doanh nghiệp"
-            else:
-                reply = "Điểm của bạn hơi thấp, nên cố gắng thêm để vào HSB"
-
-    # ====== FALLBACK AI ======
-    else:
-        reply = hoi_ai(user_input)
+    reply += "\n\n👉 Bạn có muốn mình phân tích sâu hơn không?"
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
     st.chat_message("assistant").write(reply)
