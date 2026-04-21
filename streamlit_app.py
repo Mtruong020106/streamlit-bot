@@ -1,11 +1,8 @@
 import streamlit as st
 from openai import OpenAI
-import os
-from dotenv import load_dotenv
 
-# ====== LOAD API KEY ======
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# ====== API KEY (DÁN KEY MỚI VÀO ĐÂY) ======
+client = OpenAI(api_key="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")
 
 # ====== CONFIG ======
 st.set_page_config(page_title="HSB AI Advisor", page_icon="🎓")
@@ -38,7 +35,7 @@ def hoi_ai(text):
             messages=[
                 {
                     "role": "system",
-                    "content": "Bạn là chuyên gia tư vấn ngành HSB. Hãy phân tích cực kỳ chi tiết điểm mạnh, điểm yếu, tính cách và gợi ý ngành phù hợp trong 7 ngành HSB."
+                    "content": "Bạn là chuyên gia tư vấn ngành HSB. Phân tích cực kỳ chi tiết điểm mạnh, điểm yếu, tính cách và gợi ý ngành phù hợp trong 7 ngành HSB."
                 },
                 {
                     "role": "user",
