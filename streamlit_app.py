@@ -4,17 +4,17 @@ from groq import Groq
 # ======================
 # CONFIG
 # ======================
-st.set_page_config(page_title="HSB AI Counselor", page_icon="🎓", layout="centered")
+st.set_page_config(page_title="HSB Counselor", page_icon="🎓", layout="centered")
 
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 # ======================
-# STYLE
+# STYLE (GIẢ TƯ VẤN VIÊN THẬT)
 # ======================
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg, #eef2f7, #ffffff);
+    background: #f6f8fb;
     font-family: Arial;
 }
 
@@ -22,16 +22,21 @@ h1 {
     text-align: center;
     color: #1f4e79;
 }
+
+.chat-bubble {
+    padding: 10px;
+    border-radius: 10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🎓 HSB AI Admission Counselor")
-st.caption("AI tư vấn ngành học + hỏi ngược + cập nhật lại phân tích")
+st.title("🎓 HSB Admission Counselor (Realistic Mode)")
+st.caption("Tư vấn viên AI - hỏi sâu - không bịa ngành")
 
 # ======================
-# NGÀNH HSB (KHÓA CỨNG)
+# NGÀNH KHÓA CỨNG (TUYỆT ĐỐI KHÔNG THAY ĐỔI)
 # ======================
-HSB_LIST = [
+HSB = [
     "Marketing & Truyền thông",
     "Công nghệ & Doanh nghiệp",
     "Dịch vụ & Chăm sóc",
@@ -42,87 +47,82 @@ HSB_LIST = [
 ]
 
 # ======================
-# MODEL FALLBACK
+# MODEL SAFE
 # ======================
 MODELS = [
-    "llama-3.1-8b-instant",
-    "llama-3.2-11b-text-preview"
+    "llama-3.1-8b-instant"
 ]
 
 # ======================
-# AI FUNCTION (KHÓA NGÀNH + HỎI NGƯỢC)
+# AI COUNSELOR (GIỐNG NGƯỜI THẬT)
 # ======================
-def hoi_ai(profile):
-    last_error = None
+def counselor_ai(profile, user_reply_round=None):
+    try:
+        system_prompt = f"""
+Bạn là cố vấn tuyển sinh đại học chuyên nghiệp.
 
-    for model in MODELS:
-        try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "Bạn là chuyên gia tư vấn tuyển sinh HSB.\n\n"
-                            "⚠️ QUY TẮC BẮT BUỘC:\n"
-                            f"- CHỈ được chọn trong danh sách:\n{HSB_LIST}\n"
-                            "- KHÔNG được tạo ngành mới\n"
-                            "- KHÔNG được nói ngành ngoài danh sách\n\n"
-                            "🎯 NHIỆM VỤ:\n"
-                            "1. Phân tích tính cách học sinh\n"
-                            "2. Chấm điểm từng ngành (0-10)\n"
-                            "3. Chọn 1 ngành phù hợp nhất\n"
-                            "4. Giải thích lý do\n"
-                            "5. ĐẶC BIỆT: hỏi lại 2 câu sâu hơn để hiểu thêm\n\n"
-                            "⚡ QUAN TRỌNG:\n"
-                            "- Nếu thiếu thông tin → hỏi lại thay vì đoán\n"
-                            "- Luôn tư duy lại sau khi có câu trả lời mới"
-                        )
-                    },
-                    {"role": "user", "content": profile}
-                ]
-            )
-            return response.choices[0].message.content
+⚠️ QUY TẮC TUYỆT ĐỐI:
+- Chỉ được chọn trong 7 ngành sau:
+{HSB}
+- Không được tạo ngành mới
+- Không được nhắc ngành ngoài danh sách
 
-        except Exception as e:
-            last_error = e
-            continue
+🎯 PHONG CÁCH:
+- Giống tư vấn viên thật 1:1
+- Không trả lời máy móc
+- Có cảm xúc, có phân tích logic
 
-    return f"⚠️ AI lỗi toàn bộ model: {last_error}"
+🎯 QUY TRÌNH:
+1. Phân tích học sinh
+2. So sánh các ngành (CHỈ trong danh sách)
+3. Chọn 1 ngành phù hợp nhất
+4. Giải thích ngắn gọn
+5. HỎI NGƯỢC 1–2 câu để hiểu sâu hơn
+
+🔥 QUAN TRỌNG:
+Nếu thông tin chưa đủ → phải hỏi lại, không được đoán.
+"""
+
+        if user_reply_round:
+            profile = profile + "\n\nCập nhật từ học sinh: " + user_reply_round
+
+        response = client.chat.completions.create(
+            model=MODELS[0],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": profile}
+            ]
+        )
+
+        return response.choices[0].message.content
+
+    except Exception as e:
+        return f"⚠️ Lỗi AI: {e}"
 
 # ======================
-# SESSION STATE
+# SESSION
 # ======================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "step" not in st.session_state:
-    st.session_state.step = 0
+    st.session_state.step = 1
 
 if "profile" not in st.session_state:
     st.session_state.profile = ""
 
-# ======================
-# INIT
-# ======================
 if len(st.session_state.messages) == 0:
     st.session_state.messages.append({
         "role": "assistant",
-        "content": (
-            "👋 Chào bạn!\n\n"
-            "Mình là cố vấn tuyển sinh HSB.\n"
-            "Mình sẽ hỏi bạn từng bước để phân tích chính xác nhất.\n\n"
-            "👉 Câu 1: Điểm mạnh lớn nhất của bạn là gì?"
-        )
+        "content": "👋 Mình là cố vấn tuyển sinh HSB.\n\n👉 Bạn hãy nói điểm mạnh của bạn trước."
     })
-    st.session_state.step = 1
 
 # ======================
 # CHAT DISPLAY
 # ======================
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+for m in st.session_state.messages:
+    with st.chat_message(m["role"]):
+        st.write(m["content"])
 
 # ======================
 # INPUT
@@ -148,25 +148,24 @@ if user_input:
     elif st.session_state.step == 3:
         st.session_state.profile += " Sở thích: " + user_input
 
-        with st.spinner("🎓 Đang phân tích..."):
-            ai_text = hoi_ai(st.session_state.profile)
+        with st.spinner("🧠 Cố vấn đang phân tích..."):
+            ai = counselor_ai(st.session_state.profile)
 
-        reply = f"## 🎯 Phân tích ban đầu\n\n{ai_text}\n\n---\n👉 Bạn có thể bổ sung thêm: bạn thích môi trường áp lực cao hay ổn định?"
+        reply = "## 🎯 Phân tích ban đầu\n\n" + ai
+        reply += "\n\n👉 Mình hỏi thêm: Bạn thích môi trường ổn định hay áp lực cao?"
         st.session_state.step = 4
 
-    # STEP 4 → UPDATE THINKING (QUAN TRỌNG)
+    # STEP 4 → THINK AGAIN (GIỐNG TƯ VẤN THẬT)
     elif st.session_state.step == 4:
-        st.session_state.profile += " Môi trường làm việc: " + user_input
+        with st.spinner("🔄 Cố vấn đang suy nghĩ lại..."):
+            ai = counselor_ai(st.session_state.profile, user_input)
 
-        with st.spinner("🧠 Đang cập nhật lại phân tích..."):
-            ai_text = hoi_ai(st.session_state.profile)
-
-        reply = f"## 🔄 Phân tích cập nhật (tư duy lại)\n\n{ai_text}\n\n---\n👉 Bạn muốn mình giải thích sâu hơn về ngành nào không?"
+        reply = "## 🔄 Cập nhật tư vấn (giống tư vấn viên thật)\n\n" + ai
+        reply += "\n\n👉 Nếu muốn, mình có thể phân tích sâu hơn 1 ngành cụ thể cho bạn."
         st.session_state.step = 5
 
-    # STEP 5
     else:
-        reply = "👉 Nếu muốn làm lại bài test, hãy refresh trang."
+        reply = "👉 Bạn có thể refresh để làm lại bài test."
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
     st.rerun()
