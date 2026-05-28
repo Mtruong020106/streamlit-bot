@@ -487,19 +487,16 @@ NHIỆM VỤ: Trả về ĐÚNG JSON sau, KHÔNG có markdown, KHÔNG có text t
 
 QUY TẮC BẮT BUỘC:
 - Mảng career_paths BẮT BUỘC phải chứa ĐÚNG 5 gợi ý công việc tương lai chi tiết nhất dựa trên hồ sơ.
-- Điểm số PHẢI phân hóa mạnh (có ngành 3-5 điểm, có ngành 8-9 điểm, không dàn đều)
+- Điểm số PHẢI phân hóa mạnh (có ngành 3-5 điểm, có ngành 8-9 điểm, không dàn đều). Điểm là một số từ 1-10.
 - Không bịa ngành mới.
 - Chỉ trả về JSON thuần hợp lệ. Tiếng Việt."""
 
-    # Gọi API bắt buộc trả về định dạng JSON
     raw = call_groq(system=system, user="Phân tích hồ sơ và trả về JSON chuẩn.", max_tokens=2000, is_json=True)
     
     try:
-        # Nếu chạy được JSON mode thì parse luôn
         return json.loads(raw)
     except Exception as e:
         print("Lỗi parse từ is_json:", e)
-        # Fallback an toàn dùng Regex để bắt khối JSON nếu API vẫn rò rỉ text
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
             try:
@@ -527,23 +524,52 @@ Trả lời câu hỏi/yêu cầu của học sinh một cách cụ thể, cá n
 # RESULT CARD RENDERER
 # =========================================================
 def render_result_card(data: dict) -> str:
-    e = html_lib.escape
+    # --- Hàm lọc cực kỳ an toàn ---
+    def safe_escape(val):
+        if isinstance(val, list):
+            val = " ".join(str(v) for v in val)
+        elif val is None or isinstance(val, dict):
+            val = ""
+        return html_lib.escape(str(val))
+    
+    e = safe_escape
+    
+    # Ép kiểu dữ liệu an toàn để tránh vòng lặp bị sập nếu AI trả về chuỗi thay vì list
+    def ensure_list(val):
+        if isinstance(val, list): return val
+        if isinstance(val, str): return [val]
+        return []
 
-    scores    = sorted(data.get("scores", []), key=lambda x: x.get("score", 0), reverse=True)
+    # Xử lý an toàn cho danh sách ngành và điểm số
+    raw_scores = data.get("scores", [])
+    if not isinstance(raw_scores, list):
+        raw_scores = [raw_scores] if isinstance(raw_scores, dict) else []
+
+    def parse_score(item):
+        try:
+            return float(item.get("score", 0)) if isinstance(item, dict) else 0
+        except (ValueError, TypeError):
+            return 0
+
+    scores = sorted([s for s in raw_scores if isinstance(s, dict)], key=parse_score, reverse=True)
     top_major = data.get("top_major", "")
 
     # ── Personality tags ──
     tags_html = ""
-    for tag in data.get("personality_tags", []):
+    for tag in ensure_list(data.get("personality_tags", [])):
         tags_html += f'<span style="display:inline-block;background:#e8f0fb;color:#163d6e;font-size:0.72rem;font-weight:600;padding:3px 10px;border-radius:99px;margin:0 4px 4px 0;letter-spacing:0.03em;">{e(tag)}</span>'
 
     # ── Score bars ──
     bars_html = ""
     for item in scores:
-        major   = item.get("major", "")
-        score   = item.get("score", 0)
+        major   = str(item.get("major", ""))
+        score   = parse_score(item)
         comment = item.get("comment", "")
-        pct     = int(score * 10)
+        
+        # Ép giới hạn phần trăm từ 0 - 100 tránh lỗi CSS width
+        pct     = min(100, max(0, int(score * 10))) 
+        display_score = f"{int(score)}" if score.is_integer() else f"{score}"
+        
         icon    = MAJOR_ICONS.get(major, "📌")
         is_top  = (major == top_major)
 
@@ -564,7 +590,7 @@ def render_result_card(data: dict) -> str:
         <div style="{wrap_style}">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <span style="{name_style}">{icon} {e(major)}{badge}</span>
-            <span style="{score_style}">{score}/10</span>
+            <span style="{score_style}">{display_score}/10</span>
           </div>
           <div style="background:#e2e8f0;border-radius:99px;height:6px;margin-bottom:6px;overflow:hidden;">
             <div style="width:{pct}%;height:100%;background:{bar_color};border-radius:99px;"></div>
@@ -572,19 +598,19 @@ def render_result_card(data: dict) -> str:
           <div style="font-size:0.77rem;color:#6b7280;line-height:1.5;">{e(comment)}</div>
         </div>"""
 
-    # ── Career paths (Updated to handle 5 jobs) ──
+    # ── Career paths ──
     paths_html = ""
-    for cp in data.get("career_paths", []):
+    for cp in ensure_list(data.get("career_paths", [])):
         paths_html += f'<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f0f4f8;"><span style="color:#1e5ca8;font-size:0.8rem;">▸</span><span style="font-size:0.86rem;color:#374151;">{e(cp)}</span></div>'
 
     # ── Strengths match ──
     sm_html = ""
-    for sm in data.get("strengths_match", []):
+    for sm in ensure_list(data.get("strengths_match", [])):
         sm_html += f'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;"><span style="color:#059669;font-size:0.85rem;margin-top:1px;">✓</span><span style="font-size:0.86rem;color:#374151;">{e(sm)}</span></div>'
 
     # ── Tips ──
     tips_html = ""
-    for i, tip in enumerate(data.get("tips", []), 1):
+    for i, tip in enumerate(ensure_list(data.get("tips", [])), 1):
         tips_html += f'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;"><div style="min-width:22px;height:22px;background:#0b2545;color:#fff;border-radius:50%;font-size:0.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;">{i}</div><div style="font-size:0.87rem;color:#374151;line-height:1.6;">{e(tip)}</div></div>'
 
     watch_out = data.get("watch_out", "")
