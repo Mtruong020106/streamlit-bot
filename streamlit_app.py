@@ -524,7 +524,6 @@ Trả lời câu hỏi/yêu cầu của học sinh một cách cụ thể, cá n
 # RESULT CARD RENDERER
 # =========================================================
 def render_result_card(data: dict) -> str:
-    # --- Hàm lọc cực kỳ an toàn ---
     def safe_escape(val):
         if isinstance(val, list):
             val = " ".join(str(v) for v in val)
@@ -534,13 +533,11 @@ def render_result_card(data: dict) -> str:
     
     e = safe_escape
     
-    # Ép kiểu dữ liệu an toàn để tránh vòng lặp bị sập nếu AI trả về chuỗi thay vì list
     def ensure_list(val):
         if isinstance(val, list): return val
         if isinstance(val, str): return [val]
         return []
 
-    # Xử lý an toàn cho danh sách ngành và điểm số
     raw_scores = data.get("scores", [])
     if not isinstance(raw_scores, list):
         raw_scores = [raw_scores] if isinstance(raw_scores, dict) else []
@@ -554,22 +551,17 @@ def render_result_card(data: dict) -> str:
     scores = sorted([s for s in raw_scores if isinstance(s, dict)], key=parse_score, reverse=True)
     top_major = data.get("top_major", "")
 
-    # ── Personality tags ──
     tags_html = ""
     for tag in ensure_list(data.get("personality_tags", [])):
         tags_html += f'<span style="display:inline-block;background:#e8f0fb;color:#163d6e;font-size:0.72rem;font-weight:600;padding:3px 10px;border-radius:99px;margin:0 4px 4px 0;letter-spacing:0.03em;">{e(tag)}</span>'
 
-    # ── Score bars ──
     bars_html = ""
     for item in scores:
         major   = str(item.get("major", ""))
         score   = parse_score(item)
         comment = item.get("comment", "")
-        
-        # Ép giới hạn phần trăm từ 0 - 100 tránh lỗi CSS width
         pct     = min(100, max(0, int(score * 10))) 
         display_score = f"{int(score)}" if score.is_integer() else f"{score}"
-        
         icon    = MAJOR_ICONS.get(major, "📌")
         is_top  = (major == top_major)
 
@@ -586,94 +578,84 @@ def render_result_card(data: dict) -> str:
             score_style = "font-weight:700;color:#6b7280;font-size:0.85rem;"
             badge       = ""
 
-        bars_html += f"""
-        <div style="{wrap_style}">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span style="{name_style}">{icon} {e(major)}{badge}</span>
-            <span style="{score_style}">{display_score}/10</span>
-          </div>
-          <div style="background:#e2e8f0;border-radius:99px;height:6px;margin-bottom:6px;overflow:hidden;">
-            <div style="width:{pct}%;height:100%;background:{bar_color};border-radius:99px;"></div>
-          </div>
-          <div style="font-size:0.77rem;color:#6b7280;line-height:1.5;">{e(comment)}</div>
-        </div>"""
+        bars_html += f"""<div style="{wrap_style}">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+<span style="{name_style}">{icon} {e(major)}{badge}</span>
+<span style="{score_style}">{display_score}/10</span>
+</div>
+<div style="background:#e2e8f0;border-radius:99px;height:6px;margin-bottom:6px;overflow:hidden;">
+<div style="width:{pct}%;height:100%;background:{bar_color};border-radius:99px;"></div>
+</div>
+<div style="font-size:0.77rem;color:#6b7280;line-height:1.5;">{e(comment)}</div>
+</div>"""
 
-    # ── Career paths ──
     paths_html = ""
     for cp in ensure_list(data.get("career_paths", [])):
         paths_html += f'<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f0f4f8;"><span style="color:#1e5ca8;font-size:0.8rem;">▸</span><span style="font-size:0.86rem;color:#374151;">{e(cp)}</span></div>'
 
-    # ── Strengths match ──
     sm_html = ""
     for sm in ensure_list(data.get("strengths_match", [])):
         sm_html += f'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;"><span style="color:#059669;font-size:0.85rem;margin-top:1px;">✓</span><span style="font-size:0.86rem;color:#374151;">{e(sm)}</span></div>'
 
-    # ── Tips ──
     tips_html = ""
     for i, tip in enumerate(ensure_list(data.get("tips", [])), 1):
         tips_html += f'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;"><div style="min-width:22px;height:22px;background:#0b2545;color:#fff;border-radius:50%;font-size:0.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;">{i}</div><div style="font-size:0.87rem;color:#374151;line-height:1.6;">{e(tip)}</div></div>'
 
     watch_out = data.get("watch_out", "")
 
-    card = f"""
-<div style="font-family:'Inter',Arial,sans-serif;max-width:740px;margin:0 auto;">
+    card = f"""<div style="font-family:'Inter',Arial,sans-serif;max-width:740px;margin:0 auto;">
+<div style="background:linear-gradient(140deg,#0b2545 0%,#163d6e 55%,#1e5ca8 100%);border-radius:18px;padding:26px 28px 22px;margin-bottom:14px;position:relative;overflow:hidden;">
+<div style="position:absolute;top:-50px;right:-50px;width:200px;height:200px;background:radial-gradient(circle,rgba(201,164,74,0.18) 0%,transparent 65%);border-radius:50%;"></div>
+<div style="font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-bottom:6px;font-weight:600;">Kết quả phân tích cá nhân</div>
+<div style="font-size:1.35rem;font-weight:800;color:#fff;letter-spacing:-0.02em;margin-bottom:10px;">Hồ sơ của bạn đã sẵn sàng ✓</div>
+<div style="height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.2),transparent);margin-bottom:14px;"></div>
+<div style="font-size:0.88rem;color:rgba(255,255,255,0.85);line-height:1.7;">{e(data.get("personality",""))}</div>
+<div style="margin-top:12px;">{tags_html}</div>
+</div>
 
-  <div style="background:linear-gradient(140deg,#0b2545 0%,#163d6e 55%,#1e5ca8 100%);border-radius:18px;padding:26px 28px 22px;margin-bottom:14px;position:relative;overflow:hidden;">
-    <div style="position:absolute;top:-50px;right:-50px;width:200px;height:200px;background:radial-gradient(circle,rgba(201,164,74,0.18) 0%,transparent 65%);border-radius:50%;"></div>
-    <div style="font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-bottom:6px;font-weight:600;">Kết quả phân tích cá nhân</div>
-    <div style="font-size:1.35rem;font-weight:800;color:#fff;letter-spacing:-0.02em;margin-bottom:10px;">Hồ sơ của bạn đã sẵn sàng ✓</div>
-    <div style="height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.2),transparent);margin-bottom:14px;"></div>
-    <div style="font-size:0.88rem;color:rgba(255,255,255,0.85);line-height:1.7;">{e(data.get("personality",""))}</div>
-    <div style="margin-top:12px;">{tags_html}</div>
-  </div>
+<div style="background:#fff;border:1.5px solid #1e5ca8;border-radius:18px;padding:24px 28px;margin-bottom:14px;position:relative;overflow:hidden;">
+<div style="position:absolute;top:0;left:0;width:5px;height:100%;background:linear-gradient(180deg,#0b2545,#1e5ca8);border-radius:18px 0 0 18px;"></div>
+<div style="padding-left:8px;">
+<div style="font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:#1e5ca8;font-weight:700;margin-bottom:6px;">🎯 Ngành phù hợp nhất</div>
+<div style="font-size:1.5rem;font-weight:800;color:#0b2545;letter-spacing:-0.02em;margin-bottom:4px;">{MAJOR_ICONS.get(top_major,"📌")} {e(top_major)}</div>
+<div style="height:1px;background:#e8f0fb;margin:12px 0;"></div>
+<div style="font-size:0.89rem;color:#374151;line-height:1.75;">{e(data.get("top_reason",""))}</div>
+</div>
+</div>
 
-  <div style="background:#fff;border:1.5px solid #1e5ca8;border-radius:18px;padding:24px 28px;margin-bottom:14px;position:relative;overflow:hidden;">
-    <div style="position:absolute;top:0;left:0;width:5px;height:100%;background:linear-gradient(180deg,#0b2545,#1e5ca8);border-radius:18px 0 0 18px;"></div>
-    <div style="padding-left:8px;">
-      <div style="font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:#1e5ca8;font-weight:700;margin-bottom:6px;">🎯 Ngành phù hợp nhất</div>
-      <div style="font-size:1.5rem;font-weight:800;color:#0b2545;letter-spacing:-0.02em;margin-bottom:4px;">{MAJOR_ICONS.get(top_major,"📌")} {e(top_major)}</div>
-      <div style="height:1px;background:#e8f0fb;margin:12px 0;"></div>
-      <div style="font-size:0.89rem;color:#374151;line-height:1.75;">{e(data.get("top_reason",""))}</div>
-    </div>
-  </div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+<div style="background:#fff;border:1px solid #dde3ec;border-radius:16px;padding:20px 22px;">
+<div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:12px;">💼 5 Công việc đề xuất</div>
+{paths_html}
+</div>
+<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:16px;padding:20px 22px;">
+<div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#059669;font-weight:700;margin-bottom:12px;">✅ Điểm mạnh phù hợp</div>
+{sm_html}
+</div>
+</div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+<div style="background:#fff;border:1px solid #dde3ec;border-radius:18px;padding:22px 24px;margin-bottom:14px;">
+<div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:16px;">📊 Mức độ phù hợp tất cả ngành</div>
+{bars_html}
+</div>
 
-    <div style="background:#fff;border:1px solid #dde3ec;border-radius:16px;padding:20px 22px;">
-      <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:12px;">💼 5 Công việc đề xuất</div>
-      {paths_html}
-    </div>
+<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:16px 22px;margin-bottom:14px;display:flex;gap:12px;align-items:flex-start;">
+<span style="font-size:1.1rem;margin-top:1px;">⚠️</span>
+<div>
+<div style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:#92400e;font-weight:700;margin-bottom:4px;">Lưu ý quan trọng</div>
+<div style="font-size:0.87rem;color:#78350f;line-height:1.6;">{e(watch_out)}</div>
+</div>
+</div>
 
-    <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:16px;padding:20px 22px;">
-      <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#059669;font-weight:700;margin-bottom:12px;">✅ Điểm mạnh phù hợp</div>
-      {sm_html}
-    </div>
+<div style="background:#fff;border:1px solid #dde3ec;border-radius:18px;padding:22px 24px;margin-bottom:14px;">
+<div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:16px;">💡 Lời khuyên thực tế</div>
+{tips_html}
+</div>
 
-  </div>
-
-  <div style="background:#fff;border:1px solid #dde3ec;border-radius:18px;padding:22px 24px;margin-bottom:14px;">
-    <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:16px;">📊 Mức độ phù hợp tất cả ngành</div>
-    {bars_html}
-  </div>
-
-  <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:16px 22px;margin-bottom:14px;display:flex;gap:12px;align-items:flex-start;">
-    <span style="font-size:1.1rem;margin-top:1px;">⚠️</span>
-    <div>
-      <div style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:#92400e;font-weight:700;margin-bottom:4px;">Lưu ý quan trọng</div>
-      <div style="font-size:0.87rem;color:#78350f;line-height:1.6;">{e(watch_out)}</div>
-    </div>
-  </div>
-
-  <div style="background:#fff;border:1px solid #dde3ec;border-radius:18px;padding:22px 24px;margin-bottom:14px;">
-    <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:16px;">💡 Lời khuyên thực tế</div>
-    {tips_html}
-  </div>
-
-  <div style="background:linear-gradient(135deg,#f2f5f9,#e8f0fb);border:1px solid #dde3ec;border-radius:14px;padding:18px 22px;display:flex;gap:12px;align-items:flex-start;">
-    <span style="font-size:1rem;margin-top:2px;">💬</span>
-    <div style="font-size:0.88rem;color:#374151;line-height:1.7;">{e(data.get("followup","Bạn muốn tìm hiểu thêm điều gì về ngành này không?"))}</div>
-  </div>
-
+<div style="background:linear-gradient(135deg,#f2f5f9,#e8f0fb);border:1px solid #dde3ec;border-radius:14px;padding:18px 22px;display:flex;gap:12px;align-items:flex-start;">
+<span style="font-size:1rem;margin-top:2px;">💬</span>
+<div style="font-size:0.88rem;color:#374151;line-height:1.7;">{e(data.get("followup","Bạn muốn tìm hiểu thêm điều gì về ngành này không?"))}</div>
+</div>
 </div>"""
     return card
 
