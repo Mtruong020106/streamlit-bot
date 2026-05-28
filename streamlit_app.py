@@ -175,9 +175,7 @@ st.markdown("""
     margin: 0 auto !important;
 }
 
-/* ════════════════════════════════
-   HEADER
-════════════════════════════════ */
+/* HEADER */
 .hsb-header {
     background: linear-gradient(140deg, #0b2545 0%, #163d6e 50%, #1e5ca8 100%);
     padding: 0;
@@ -252,9 +250,7 @@ st.markdown("""
     margin: 0 0 16px;
 }
 
-/* ════════════════════════════════
-   PROGRESS
-════════════════════════════════ */
+/* PROGRESS */
 .progress-outer {
     padding: 0 36px 20px;
     background: linear-gradient(140deg, #0b2545 0%, #163d6e 50%, #1e5ca8 100%);
@@ -294,9 +290,7 @@ st.markdown("""
     box-shadow: 0 0 8px rgba(79,163,224,0.5);
 }
 
-/* ════════════════════════════════
-   CHAT
-════════════════════════════════ */
+/* CHAT */
 .chat-area {
     padding: 4px 20px 0;
 }
@@ -334,9 +328,7 @@ div[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) .stMar
     box-shadow: var(--shadow-md) !important;
 }
 
-/* ════════════════════════════════
-   CHAT INPUT
-════════════════════════════════ */
+/* CHAT INPUT */
 div[data-testid="stChatInput"] {
     border-radius: 14px !important;
     border: 1.5px solid var(--border) !important;
@@ -415,20 +407,25 @@ st.markdown(f"""
 # =========================================================
 # AI HELPERS
 # =========================================================
-def call_groq(system: str, user: str, max_tokens: int = 600) -> str:
+def call_groq(system: str, user: str, max_tokens: int = 800, is_json: bool = False) -> str:
     for model in ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"]:
         try:
-            r = client.chat.completions.create(
-                model=model,
-                messages=[
+            kwargs = {
+                "model": model,
+                "messages": [
                     {"role": "system", "content": system},
                     {"role": "user",   "content": user}
                 ],
-                temperature=0.75,
-                max_tokens=max_tokens,
-            )
+                "temperature": 0.7,
+                "max_tokens": max_tokens,
+            }
+            if is_json:
+                kwargs["response_format"] = {"type": "json_object"}
+
+            r = client.chat.completions.create(**kwargs)
             return r.choices[0].message.content
-        except Exception:
+        except Exception as e:
+            print(f"Lỗi gọi Groq ({model}):", e)
             continue
     return "⚠️ Lỗi kết nối AI. Vui lòng thử lại."
 
@@ -471,13 +468,13 @@ HỒ SƠ HỌC SINH:
 NGÀNH HỢP LỆ:
 {majors_list}
 
-NHIỆM VỤ: Trả về ĐÚNG JSON sau, KHÔNG có markdown, KHÔNG có text thêm, KHÔNG có ```json:
+NHIỆM VỤ: Trả về ĐÚNG JSON sau, KHÔNG có markdown, KHÔNG có text thêm:
 {{
-  "personality": "3 câu nhận xét tâm lý sâu, cá nhân hóa cao, không chung chung, không sáo rỗng",
+  "personality": "3 câu nhận xét tâm lý sâu, cá nhân hóa cao, không chung chung",
   "personality_tags": ["tag1", "tag2", "tag3"],
   "top_major": "tên ngành phù hợp nhất (đúng tên trong danh sách)",
   "top_reason": "5-6 câu lý giải cụ thể, thuyết phục, liên hệ trực tiếp tính cách/học lực/mục tiêu/gia đình",
-  "career_paths": ["nghề nghiệp cụ thể 1", "nghề nghiệp cụ thể 2", "nghề nghiệp cụ thể 3"],
+  "career_paths": ["công việc 1", "công việc 2", "công việc 3", "công việc 4", "công việc 5"],
   "scores": [
     {{"major": "tên ngành", "score": 8, "comment": "nhận xét 1 câu cụ thể liên quan hồ sơ"}},
     ...đủ 7 ngành...
@@ -489,16 +486,26 @@ NHIỆM VỤ: Trả về ĐÚNG JSON sau, KHÔNG có markdown, KHÔNG có text t
 }}
 
 QUY TẮC BẮT BUỘC:
+- Mảng career_paths BẮT BUỘC phải chứa ĐÚNG 5 gợi ý công việc tương lai chi tiết nhất dựa trên hồ sơ.
 - Điểm số PHẢI phân hóa mạnh (có ngành 3-5 điểm, có ngành 8-9 điểm, không dàn đều)
-- Không bịa ngành mới
-- Chỉ trả về JSON thuần
-- Tiếng Việt, tự nhiên, sâu sắc"""
+- Không bịa ngành mới.
+- Chỉ trả về JSON thuần hợp lệ. Tiếng Việt."""
 
-    raw = call_groq(system=system, user="Phân tích và trả về JSON.", max_tokens=2000)
+    # Gọi API bắt buộc trả về định dạng JSON
+    raw = call_groq(system=system, user="Phân tích hồ sơ và trả về JSON chuẩn.", max_tokens=2000, is_json=True)
+    
     try:
-        cleaned = re.sub(r"```json|```", "", raw).strip()
-        return json.loads(cleaned)
-    except Exception:
+        # Nếu chạy được JSON mode thì parse luôn
+        return json.loads(raw)
+    except Exception as e:
+        print("Lỗi parse từ is_json:", e)
+        # Fallback an toàn dùng Regex để bắt khối JSON nếu API vẫn rò rỉ text
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except:
+                pass
         return raw
 
 
@@ -565,7 +572,7 @@ def render_result_card(data: dict) -> str:
           <div style="font-size:0.77rem;color:#6b7280;line-height:1.5;">{e(comment)}</div>
         </div>"""
 
-    # ── Career paths ──
+    # ── Career paths (Updated to handle 5 jobs) ──
     paths_html = ""
     for cp in data.get("career_paths", []):
         paths_html += f'<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f0f4f8;"><span style="color:#1e5ca8;font-size:0.8rem;">▸</span><span style="font-size:0.86rem;color:#374151;">{e(cp)}</span></div>'
@@ -585,7 +592,6 @@ def render_result_card(data: dict) -> str:
     card = f"""
 <div style="font-family:'Inter',Arial,sans-serif;max-width:740px;margin:0 auto;">
 
-  <!-- ══ HEADER CARD ══ -->
   <div style="background:linear-gradient(140deg,#0b2545 0%,#163d6e 55%,#1e5ca8 100%);border-radius:18px;padding:26px 28px 22px;margin-bottom:14px;position:relative;overflow:hidden;">
     <div style="position:absolute;top:-50px;right:-50px;width:200px;height:200px;background:radial-gradient(circle,rgba(201,164,74,0.18) 0%,transparent 65%);border-radius:50%;"></div>
     <div style="font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-bottom:6px;font-weight:600;">Kết quả phân tích cá nhân</div>
@@ -595,7 +601,6 @@ def render_result_card(data: dict) -> str:
     <div style="margin-top:12px;">{tags_html}</div>
   </div>
 
-  <!-- ══ TOP MAJOR ══ -->
   <div style="background:#fff;border:1.5px solid #1e5ca8;border-radius:18px;padding:24px 28px;margin-bottom:14px;position:relative;overflow:hidden;">
     <div style="position:absolute;top:0;left:0;width:5px;height:100%;background:linear-gradient(180deg,#0b2545,#1e5ca8);border-radius:18px 0 0 18px;"></div>
     <div style="padding-left:8px;">
@@ -606,16 +611,13 @@ def render_result_card(data: dict) -> str:
     </div>
   </div>
 
-  <!-- ══ 2-COL: career paths + strengths ══ -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
 
-    <!-- Career paths -->
     <div style="background:#fff;border:1px solid #dde3ec;border-radius:16px;padding:20px 22px;">
-      <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:12px;">💼 Hướng nghề nghiệp</div>
+      <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:12px;">💼 5 Công việc đề xuất</div>
       {paths_html}
     </div>
 
-    <!-- Strengths match -->
     <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:16px;padding:20px 22px;">
       <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#059669;font-weight:700;margin-bottom:12px;">✅ Điểm mạnh phù hợp</div>
       {sm_html}
@@ -623,13 +625,11 @@ def render_result_card(data: dict) -> str:
 
   </div>
 
-  <!-- ══ SCORE BARS ══ -->
   <div style="background:#fff;border:1px solid #dde3ec;border-radius:18px;padding:22px 24px;margin-bottom:14px;">
     <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:16px;">📊 Mức độ phù hợp tất cả ngành</div>
     {bars_html}
   </div>
 
-  <!-- ══ WATCH OUT ══ -->
   <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:16px 22px;margin-bottom:14px;display:flex;gap:12px;align-items:flex-start;">
     <span style="font-size:1.1rem;margin-top:1px;">⚠️</span>
     <div>
@@ -638,13 +638,11 @@ def render_result_card(data: dict) -> str:
     </div>
   </div>
 
-  <!-- ══ TIPS ══ -->
   <div style="background:#fff;border:1px solid #dde3ec;border-radius:18px;padding:22px 24px;margin-bottom:14px;">
     <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:16px;">💡 Lời khuyên thực tế</div>
     {tips_html}
   </div>
 
-  <!-- ══ FOLLOWUP ══ -->
   <div style="background:linear-gradient(135deg,#f2f5f9,#e8f0fb);border:1px solid #dde3ec;border-radius:14px;padding:18px 22px;display:flex;gap:12px;align-items:flex-start;">
     <span style="font-size:1rem;margin-top:2px;">💬</span>
     <div style="font-size:0.88rem;color:#374151;line-height:1.7;">{e(data.get("followup","Bạn muốn tìm hiểu thêm điều gì về ngành này không?"))}</div>
