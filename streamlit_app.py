@@ -44,7 +44,7 @@ FLOW = [
     {
         "type": "question",
         "key": "intro",
-        "text": "👋 Chào bạn! Mình là cố vấn tuyển sinh HSB.\n\nMình sẽ hỏi bạn một vài câu để hiểu rõ hơn — không có đúng sai đâu nhé, cứ trả lời tự nhiên thôi 😊\n\n**Bạn đang học lớp mấy, và điều khiến bạn băn khoăn nhất khi chọn ngành là gì?**"
+        "text": "👋 Chào bạn! Mình là AI Career Lab ChatBot.\n\nMình sẽ hỏi bạn một vài câu để hiểu rõ hơn — không có đúng sai đâu nhé, cứ trả lời tự nhiên thôi 😊\n\n**Bạn đang học lớp mấy, và điều khiến bạn băn khoăn nhất khi chọn ngành là gì?**"
     },
     {
         "type": "question",
