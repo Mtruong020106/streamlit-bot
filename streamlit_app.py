@@ -6,7 +6,7 @@ import json, re, html as html_lib
 # CONFIG
 # =========================================================
 st.set_page_config(
-    page_title="AI Career lap hub chat bot",
+    page_title="AI Career Lab Chatbot",
     page_icon="🎓",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -363,7 +363,7 @@ st.markdown("""
     <div class="hsb-top-row">
       <div class="hsb-logo-circle">🎓</div>
       <div class="hsb-title-block">
-        <p class="hsb-brand">AI Career lap hub chat bot</p>
+        <p class="hsb-brand">AI Career Lab Chatbot</p>
         <p class="hsb-tagline">Hệ thống tư vấn tuyển sinh thông minh</p>
       </div>
     </div>
